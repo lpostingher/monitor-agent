@@ -5,6 +5,7 @@ use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Postingher\MonitorAgent\Support\StackTraceFormatter;
+use Postingher\MonitorAgent\Tests\Fixtures\DecoratedExceptionHandler;
 use Postingher\MonitorAgent\Tests\Fixtures\IgnoredException;
 use Postingher\MonitorAgent\Trace;
 
@@ -73,4 +74,14 @@ test('skips exceptions the application does not report', function () {
     report(new RuntimeException('Reported'));
 
     expect(array_column(sentEventsOfType('exception'), 'message'))->toBe(['Reported']);
+});
+
+test('reports once when another package decorates the exception handler', function () {
+    $original = app(ExceptionHandler::class);
+    app()->singleton(ExceptionHandler::class, fn () => new DecoratedExceptionHandler($original));
+    app(ExceptionHandler::class);
+
+    report(new RuntimeException('Once'));
+
+    expect(sentEventsOfType('exception'))->toHaveCount(1);
 });

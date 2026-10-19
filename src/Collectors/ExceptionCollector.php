@@ -8,6 +8,7 @@ use Postingher\MonitorAgent\Support\StackTraceFormatter;
 use Postingher\MonitorAgent\Support\Timestamp;
 use Postingher\MonitorAgent\Trace;
 use Throwable;
+use WeakMap;
 
 class ExceptionCollector
 {
@@ -23,12 +24,24 @@ class ExceptionCollector
      */
     private array $context = [];
 
+    /**
+     * Exceptions already recorded, so one reported twice counts once.
+     *
+     * Handlers decorated by other packages (such as Collision in the console)
+     * can run the reportable callback more than once for a single report.
+     *
+     * @var WeakMap<Throwable, true>
+     */
+    private WeakMap $recorded;
+
     public function __construct(
         private Agent $agent,
         private Trace $trace,
         private ContextSanitizer $sanitizer,
         private StackTraceFormatter $formatter,
-    ) {}
+    ) {
+        $this->recorded = new WeakMap;
+    }
 
     /**
      * Record an exception the application reported.
@@ -36,9 +49,11 @@ class ExceptionCollector
     public function handle(Throwable $exception): void
     {
         try {
-            if ($this->agent->isFlushing()) {
+            if ($this->agent->isFlushing() || isset($this->recorded[$exception])) {
                 return;
             }
+
+            $this->recorded[$exception] = true;
 
             $this->agent->record([
                 'type' => 'exception',
