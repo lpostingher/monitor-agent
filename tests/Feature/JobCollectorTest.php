@@ -1,5 +1,8 @@
 <?php
 
+use Illuminate\Contracts\Queue\Job;
+use Illuminate\Queue\Events\JobProcessed;
+use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Events\Looping;
 use Illuminate\Queue\Events\WorkerStopping;
 use Illuminate\Support\Facades\Artisan;
@@ -98,5 +101,56 @@ test('a stopping worker sends what is left', function () {
 
     event(new WorkerStopping(0));
 
+    Http::assertSentCount(1);
+});
+
+test('errors reported between jobs are not blamed on the previous job', function () {
+    SyncStock::dispatch();
+    work();
+
+    event(new Looping('database', 'default'));
+    report(new RuntimeException('Lost connection to Redis'));
+
+    $events = collect(sentEvents());
+    $jobTrace = $events->firstWhere('type', 'job')['trace_id'];
+    $workerError = $events->firstWhere('message', 'Lost connection to Redis');
+    expect($workerError['context'])->not->toHaveKey('job')
+        ->and($workerError['trace_id'])->not->toBe($jobTrace);
+});
+
+test('jobs run inline on any sync-driver connection keep the request trace', function () {
+    config(['queue.default' => 'inline', 'queue.connections.inline' => ['driver' => 'sync']]);
+    Route::get('/order', function () {
+        ProcessOrder::dispatch();
+        report(new RuntimeException('After the job'));
+
+        return 'ok';
+    });
+
+    $this->get('/order')->assertOk();
+
+    $events = collect(sentEvents());
+    expect($events->pluck('trace_id')->unique())->toHaveCount(1)
+        ->and($events->firstWhere('type', 'exception')['context'])->not->toHaveKey('job');
+});
+
+test('a job in progress never waits for a batch to be sent', function () {
+    config(['monitor-agent.batch_size' => 2]);
+
+    $job = Mockery::mock(Job::class);
+    $job->shouldReceive('payload')->andReturn([]);
+    $job->shouldReceive('resolveName')->andReturn(ProcessOrder::class);
+    $job->shouldReceive('getQueue')->andReturn('default');
+    $job->shouldReceive('attempts')->andReturn(1);
+    $job->shouldReceive('getJobId')->andReturn('1');
+    event(new JobProcessing('database', $job));
+
+    Log::info('one');
+    Log::info('two');
+    Log::info('three');
+    Http::assertNothingSent();
+
+    event(new JobProcessed('database', $job));
+    event(new Looping('database', 'default'));
     Http::assertSentCount(1);
 });

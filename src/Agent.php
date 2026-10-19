@@ -23,6 +23,8 @@ class Agent
 
     private int $bytes = 0;
 
+    private bool $holdingFlushes = false;
+
     private int $lastFlushAt;
 
     public function __construct(private HttpTransport $transport)
@@ -55,9 +57,18 @@ class Agent
         $this->events[] = $event;
         $this->bytes += $size;
 
-        if (app()->runningInConsole()) {
+        if (app()->runningInConsole() && ! $this->holdingFlushes) {
             $this->flushIfDue();
         }
+    }
+
+    /**
+     * Keep events buffered while a queued job runs, so it never waits on the panel
+     * (possibly while holding database locks). The worker sends them between jobs.
+     */
+    public function holdFlushes(bool $hold): void
+    {
+        $this->holdingFlushes = $hold;
     }
 
     /**

@@ -67,7 +67,7 @@ class MonitorAgentServiceProvider extends ServiceProvider
         Event::listen(JobProcessed::class, [JobCollector::class, 'processed']);
         Event::listen(JobFailed::class, [JobCollector::class, 'failed']);
         Event::listen(JobReleasedAfterException::class, [JobCollector::class, 'released']);
-        Event::listen(Looping::class, fn () => $this->app->make(Agent::class)->flushIfDue());
+        Event::listen(Looping::class, [JobCollector::class, 'idle']);
         Event::listen(WorkerStopping::class, fn () => $this->app->make(Agent::class)->flush());
 
         $this->callAfterResolving(ExceptionHandler::class, function (ExceptionHandler $handler): void {

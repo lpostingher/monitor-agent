@@ -7,6 +7,7 @@ use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Events\JobReleasedAfterException;
+use Illuminate\Queue\Jobs\SyncJob;
 use Postingher\MonitorAgent\Agent;
 use Postingher\MonitorAgent\Support\Timestamp;
 use Postingher\MonitorAgent\Trace;
@@ -15,16 +16,17 @@ use Throwable;
 /**
  * Reports every attempt of a queued job.
  *
- * Each job processed by a worker gets its own trace, started when it begins so
- * the exception the worker reports after a failure still shares the job's trace.
- * Jobs on the sync connection run inside the current request and keep its trace.
+ * Each job processed by a worker gets its own trace, kept until the worker loops
+ * again so the exception it reports after a failure still shares the job's trace.
+ * Jobs run inline (sync or deferred connections) belong to the current request
+ * and keep its trace.
  */
 class JobCollector
 {
     /**
      * Start time of each attempt in progress, keyed by job object id.
      *
-     * @var array<int, array{started_at: string, hrtime: int}>
+     * @var array<int, array{started_at: string, hrtime: int, inline: bool}>
      */
     private array $attempts = [];
 
@@ -40,7 +42,10 @@ class JobCollector
     public function processing(JobProcessing $event): void
     {
         try {
-            if ($event->connectionName !== 'sync') {
+            $inline = $event->job instanceof SyncJob;
+
+            if (! $inline) {
+                $this->agent->holdFlushes(true);
                 $this->trace->start();
                 $this->exceptions->withContext(['job' => [
                     'name' => $event->job->resolveName(),
@@ -52,7 +57,23 @@ class JobCollector
             $this->attempts[spl_object_id($event->job)] = [
                 'started_at' => Timestamp::now(),
                 'hrtime' => hrtime(true),
+                'inline' => $inline,
             ];
+        } catch (Throwable) {
+            // Never let monitoring break the application.
+        }
+    }
+
+    /**
+     * Leave the finished job behind when the worker loops, and send what is due.
+     */
+    public function idle(): void
+    {
+        try {
+            $this->exceptions->forgetContext();
+            $this->trace->start();
+            $this->agent->holdFlushes(false);
+            $this->agent->flushIfDue();
         } catch (Throwable) {
             // Never let monitoring break the application.
         }
@@ -95,6 +116,10 @@ class JobCollector
             }
 
             unset($this->attempts[spl_object_id($job)]);
+
+            if (! $attempt['inline']) {
+                $this->agent->holdFlushes(false);
+            }
 
             $this->agent->record([
                 'type' => 'job',
