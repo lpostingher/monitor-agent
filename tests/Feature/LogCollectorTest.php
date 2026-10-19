@@ -8,7 +8,7 @@ use Postingher\MonitorAgent\Agent;
 use Postingher\MonitorAgent\Collectors\LogCollector;
 use Postingher\MonitorAgent\Trace;
 
-beforeEach(fn () => Http::fake(['*' => Http::response(['accepted' => 1], 202)]));
+beforeEach(fn () => fakePanel());
 
 test('reports logs with their level, message, context and trace', function () {
     Log::error('Payment failed', ['order' => 1042]);
@@ -46,7 +46,7 @@ test('redacts sensitive context', function () {
 });
 
 test('logs written while a batch is being sent are not collected', function () {
-    Http::fake(function () {
+    fakePanel(function () {
         Log::error('Written during flush');
 
         return Http::response(['accepted' => 1], 202);

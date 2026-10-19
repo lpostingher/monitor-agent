@@ -21,7 +21,7 @@ function agent(): Agent
     return app(Agent::class);
 }
 
-beforeEach(fn () => Http::fake(['*' => Http::response(['accepted' => 1], 202)]));
+beforeEach(fn () => fakePanel());
 
 test('flush sends one gzip batch with the v1 envelope', function () {
     agent()->record(['type' => 'log', 'message' => 'first']);
@@ -60,7 +60,7 @@ test('terminating the application flushes the buffer', function () {
 });
 
 test('an unreachable panel never throws and drops the batch', function () {
-    Http::fake(fn () => throw new ConnectionException('Connection refused'));
+    fakePanel(fn () => throw new ConnectionException('Connection refused'));
     agent()->record(['type' => 'log', 'message' => 'lost']);
 
     agent()->flush();
@@ -69,7 +69,7 @@ test('an unreachable panel never throws and drops the batch', function () {
 });
 
 test('a failing panel response never throws', function () {
-    Http::fake(['*' => Http::response('down', 500)]);
+    fakePanel(['*' => Http::response('down', 500)]);
     agent()->record(['type' => 'log', 'message' => 'lost']);
 
     agent()->flush();
@@ -110,7 +110,7 @@ test('long running processes send a batch once the interval passes', function ()
 });
 
 test('events recorded while sending are ignored', function () {
-    Http::fake(function () {
+    fakePanel(function () {
         agent()->record(['type' => 'log', 'message' => 'recursion']);
 
         return Http::response(['accepted' => 1], 202);
@@ -125,3 +125,48 @@ test('events recorded while sending are ignored', function () {
 test('timestamps are UTC with microseconds', function () {
     expect(Timestamp::now())->toMatch('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/');
 });
+
+test('caps the buffer in bytes, keeping room for exceptions after logs fill their share', function () {
+    config(['monitor-agent.max_buffer_bytes' => 300_000, 'monitor-agent.batch_size' => 1000]);
+
+    foreach (range(1, 10) as $index) {
+        agent()->record(['type' => 'log', 'message' => str_repeat('x', 50_000)]);
+    }
+    agent()->record(['type' => 'exception', 'message' => 'Still kept']);
+    agent()->flush();
+
+    Http::assertSent(function (Request $request) {
+        $events = envelopeOf($request)['events'];
+
+        return strlen(gzdecode($request->body())) < 300_000
+            && count(array_filter($events, fn ($event) => $event['type'] === 'log')) === 3
+            && end($events)['message'] === 'Still kept';
+    });
+});
+
+test('pauses sending for a while after the panel fails', function () {
+    fakePanel(fn () => throw new ConnectionException('Connection timed out'));
+    agent()->record(['type' => 'log', 'message' => 'first']);
+    agent()->flush();
+
+    fakePanel();
+    agent()->record(['type' => 'log', 'message' => 'during cooldown']);
+    agent()->flush();
+    Http::assertNothingSent();
+
+    $this->travel(31)->seconds();
+    agent()->record(['type' => 'log', 'message' => 'after cooldown']);
+    agent()->flush();
+    Http::assertSentCount(1);
+});
+
+test('pauses sending after a server error or rate limit', function (int $status) {
+    fakePanel(['*' => Http::response('', $status)]);
+    agent()->record(['type' => 'log', 'message' => 'first']);
+    agent()->flush();
+
+    agent()->record(['type' => 'log', 'message' => 'second']);
+    agent()->flush();
+
+    Http::assertSentCount(1);
+})->with([500, 503, 429]);

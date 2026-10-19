@@ -21,6 +21,8 @@ class Agent
 
     private bool $flushing = false;
 
+    private int $bytes = 0;
+
     private int $lastFlushAt;
 
     public function __construct(private HttpTransport $transport)
@@ -39,7 +41,19 @@ class Agent
             return;
         }
 
+        $size = strlen((string) json_encode($event, JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR));
+        $budget = (int) config('monitor-agent.max_buffer_bytes');
+
+        if (($event['type'] ?? null) === 'log') {
+            $budget = intdiv($budget * 2, 3);
+        }
+
+        if ($this->bytes + $size > $budget) {
+            return;
+        }
+
         $this->events[] = $event;
+        $this->bytes += $size;
 
         if (app()->runningInConsole()) {
             $this->flushIfDue();
@@ -71,6 +85,7 @@ class Agent
         $this->flushing = true;
         $events = $this->events;
         $this->events = [];
+        $this->bytes = 0;
 
         try {
             $this->transport->send($events);

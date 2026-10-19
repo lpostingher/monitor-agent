@@ -2,7 +2,6 @@
 
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Foundation\Auth\User;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Postingher\MonitorAgent\Support\StackTraceFormatter;
 use Postingher\MonitorAgent\Tests\Fixtures\DecoratedExceptionHandler;
@@ -10,7 +9,7 @@ use Postingher\MonitorAgent\Tests\Fixtures\IgnoredException;
 use Postingher\MonitorAgent\Trace;
 
 beforeEach(function () {
-    Http::fake(['*' => Http::response(['accepted' => 1], 202)]);
+    fakePanel();
     app()->instance(StackTraceFormatter::class, new StackTraceFormatter(dirname(__DIR__, 2), 50));
 });
 

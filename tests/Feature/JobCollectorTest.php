@@ -11,7 +11,7 @@ use Postingher\MonitorAgent\Tests\Fixtures\ProcessOrder;
 use Postingher\MonitorAgent\Tests\Fixtures\SyncStock;
 
 beforeEach(function () {
-    Http::fake(['*' => Http::response(['accepted' => 1], 202)]);
+    fakePanel();
     config(['queue.default' => 'database', 'queue.failed.database' => 'testing']);
     Artisan::call('migrate', ['--path' => Orchestra\Testbench\default_migration_path(), '--realpath' => true, '--force' => true]);
 });
