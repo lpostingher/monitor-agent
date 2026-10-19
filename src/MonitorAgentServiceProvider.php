@@ -2,7 +2,11 @@
 
 namespace Postingher\MonitorAgent;
 
+use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use Postingher\MonitorAgent\Collectors\LogCollector;
+use Postingher\MonitorAgent\Support\ContextSanitizer;
 
 class MonitorAgentServiceProvider extends ServiceProvider
 {
@@ -15,6 +19,10 @@ class MonitorAgentServiceProvider extends ServiceProvider
 
         $this->app->singleton(Agent::class);
         $this->app->singleton(Trace::class);
+        $this->app->singleton(ContextSanitizer::class, fn () => new ContextSanitizer(
+            array_map(strtolower(...), (array) config('monitor.redact_keys')),
+            (int) config('monitor.max_context_bytes'),
+        ));
     }
 
     /**
@@ -29,6 +37,15 @@ class MonitorAgentServiceProvider extends ServiceProvider
         }
 
         $this->registerFlushHooks();
+        $this->registerCollectors();
+    }
+
+    /**
+     * Listen to the application events each collector reports.
+     */
+    private function registerCollectors(): void
+    {
+        Event::listen(MessageLogged::class, [LogCollector::class, 'handle']);
     }
 
     /**
