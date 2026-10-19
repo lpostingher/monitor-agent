@@ -1,0 +1,54 @@
+{
+    "name": "postingher/monitor-agent",
+    "description": "Reports exceptions, logs and queued jobs from Laravel apps to a self-hosted Monitor panel.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["laravel", "monitoring", "exceptions", "logs", "queues"],
+    "authors": [
+        {
+            "name": "Lucas da Silva Postingher"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "guzzlehttp/guzzle": "^7.8",
+        "illuminate/http": "^12.0|^13.0",
+        "illuminate/log": "^12.0|^13.0",
+        "illuminate/queue": "^12.0|^13.0",
+        "illuminate/support": "^12.0|^13.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Postingher\\MonitorAgent\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Postingher\\MonitorAgent\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Postingher\\MonitorAgent\\MonitorAgentServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "test": "pest",
+        "lint": "pint"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "require-dev": {
+        "laravel/pint": "^1.32",
+        "orchestra/testbench": "^11.3",
+        "pestphp/pest": "^5.3"
+    }
+}
