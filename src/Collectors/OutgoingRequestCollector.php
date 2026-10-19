@@ -39,6 +39,14 @@ class OutgoingRequestCollector
         $this->record($event->request, null, null);
     }
 
+    /**
+     * Mask path segments that look like credentials, such as Slack, Discord or Telegram tokens.
+     */
+    private function maskTokens(string $path): string
+    {
+        return (string) preg_replace('#(?<=/)[A-Za-z0-9_:\-]{20,}(?=/|$)#', '*', $path);
+    }
+
     private function record(Request $request, ?int $status, ?float $seconds): void
     {
         try {
@@ -55,7 +63,7 @@ class OutgoingRequestCollector
                 'sent_at' => Timestamp::now(),
                 'method' => $request->method(),
                 'host' => mb_strcut($host, 0, 255),
-                'url' => mb_strcut(($parts['scheme'] ?? 'https').'://'.$host.(isset($parts['port']) ? ':'.$parts['port'] : '').($parts['path'] ?? ''), 0, 255),
+                'url' => mb_strcut(($parts['scheme'] ?? 'https').'://'.$host.(isset($parts['port']) ? ':'.$parts['port'] : '').$this->maskTokens($parts['path'] ?? ''), 0, 255),
                 'status' => $status,
                 'duration_ms' => $seconds === null ? null : round($seconds * 1000, 2),
             ]);

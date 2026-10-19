@@ -67,3 +67,16 @@ test('the agent does not report its own calls to the panel', function () {
     expect(app(Agent::class)->pending())->toBe(0);
     Http::assertSentCount(1);
 });
+
+test('token-like path segments are masked', function () {
+    Http::fake(['hooks.slack.com/*' => Http::response('ok'), 'api.telegram.org/*' => Http::response('ok')]);
+
+    Http::post('https://hooks.slack.com/services/T000/B000/XXXXXXXXXXXXXXXXXXXXXXXX');
+    Http::post('https://api.telegram.org/bot123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11/sendMessage');
+
+    $urls = collect(panelEvents())->where('type', 'outgoing_request')->pluck('url')->all();
+    expect($urls)->toBe([
+        'https://hooks.slack.com/services/T000/B000/*',
+        'https://api.telegram.org/*/sendMessage',
+    ]);
+});

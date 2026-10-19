@@ -15,8 +15,8 @@ use Throwable;
 class Agent
 {
     /**
-     * Event types that may only fill two thirds of the buffer, so a burst of them
-     * never pushes out the exceptions, jobs and requests recorded afterwards.
+     * Event types that may only fill two thirds of the buffer (by count and by size),
+     * so a burst of them never pushes out the exceptions, jobs and requests recorded afterwards.
      */
     private const HIGH_VOLUME_TYPES = ['log', 'query', 'outgoing_request'];
 
@@ -45,25 +45,32 @@ class Agent
      */
     public function record(array $event): void
     {
-        if ($this->flushing || count($this->events) >= (int) config('monitor-agent.max_buffer')) {
+        $isHighVolume = in_array($event['type'] ?? null, self::HIGH_VOLUME_TYPES, true);
+        $maxEvents = (int) config('monitor-agent.max_buffer');
+        $maxBytes = (int) config('monitor-agent.max_buffer_bytes');
+
+        if ($isHighVolume) {
+            $maxEvents = intdiv($maxEvents * 2, 3);
+            $maxBytes = intdiv($maxBytes * 2, 3);
+        }
+
+        if ($this->flushing || count($this->events) >= $maxEvents) {
             return;
         }
 
         $size = strlen((string) json_encode($event, JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR));
-        $budget = (int) config('monitor-agent.max_buffer_bytes');
 
-        if (in_array($event['type'] ?? null, self::HIGH_VOLUME_TYPES, true)) {
-            $budget = intdiv($budget * 2, 3);
-        }
-
-        if ($this->bytes + $size > $budget) {
+        if ($this->bytes + $size > $maxBytes) {
             return;
         }
 
         $this->events[] = $event;
         $this->bytes += $size;
 
-        if (app()->runningInConsole() && ! $this->holdingFlushes) {
+        // High-volume events often come from inside a transaction or a tight loop, so
+        // they never start a send themselves; other events, the worker loop and the
+        // end of the process send them.
+        if (app()->runningInConsole() && ! $this->holdingFlushes && ! $isHighVolume) {
             $this->flushIfDue();
         }
     }

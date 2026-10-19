@@ -81,7 +81,7 @@ test('drops events beyond the buffer limit', function () {
     config(['monitor-agent.max_buffer' => 3, 'monitor-agent.batch_size' => 100]);
 
     foreach (range(1, 5) as $index) {
-        agent()->record(['type' => 'log', 'message' => "event {$index}"]);
+        agent()->record(['type' => 'job', 'message' => "event {$index}"]);
     }
     agent()->flush();
 
@@ -92,7 +92,7 @@ test('long running processes send a batch once it is full', function () {
     config(['monitor-agent.batch_size' => 3]);
 
     foreach (range(1, 3) as $index) {
-        agent()->record(['type' => 'log', 'message' => "event {$index}"]);
+        agent()->record(['type' => 'job', 'message' => "event {$index}"]);
     }
 
     Http::assertSentCount(1);
@@ -100,11 +100,11 @@ test('long running processes send a batch once it is full', function () {
 });
 
 test('long running processes send a batch once the interval passes', function () {
-    agent()->record(['type' => 'log', 'message' => 'early']);
+    agent()->record(['type' => 'job', 'message' => 'early']);
     Http::assertNothingSent();
 
     $this->travel(11)->seconds();
-    agent()->record(['type' => 'log', 'message' => 'late']);
+    agent()->record(['type' => 'job', 'message' => 'late']);
 
     Http::assertSent(fn (Request $request) => count(envelopeOf($request)['events']) === 2);
 });

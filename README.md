@@ -22,8 +22,8 @@ That's it. The service provider is discovered automatically.
 - **Exceptions** reported by the application (respecting `dontReport`), with a stack trace relative to the project root, the request method, URL and route, the authenticated user's id, or the job being processed.
 - **Logs** at `info` and above (`MONITOR_LOG_LEVEL`), with their context.
 - **Requests**: method, route pattern, controller action, status, duration and the authenticated user's id. The URL is sent without its query string, and the `/up` health check is skipped.
-- **Queries**: the SQL with its placeholders (never the bound values), duration, connection and the file and line of your code that ran it.
-- **Outgoing requests** made with Laravel's `Http` client: method, URL without its query string, status and duration.
+- **Queries** run by your code: the SQL with its placeholders (never the bound values, and `in (...)` lists collapsed), duration, connection and the file and line that ran it. Framework housekeeping queries with no application code behind them (queue polling, sessions, cache) are skipped.
+- **Outgoing requests** made with Laravel's `Http` client: method, URL without its query string (token-like path segments such as webhook secrets are masked), status and duration.
 - **Artisan commands**: name (never the arguments), exit code and duration. Long-running commands such as `queue:work` and `schedule:run` are skipped.
 - **Scheduled tasks**: every run with its cron expression, whether it succeeded, and its duration.
 - **Queued jobs**: every attempt with its status (processed, failed or released), duration, queue and attempt number.

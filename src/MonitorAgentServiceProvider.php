@@ -57,6 +57,8 @@ class MonitorAgentServiceProvider extends ServiceProvider
         $this->app->singleton(JobCollector::class);
         $this->app->singleton(CommandCollector::class);
         $this->app->singleton(ScheduledTaskCollector::class);
+        $this->app->singleton(QueryCollector::class);
+        $this->app->singleton(OutgoingRequestCollector::class);
     }
 
     /**
