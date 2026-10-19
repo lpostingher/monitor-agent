@@ -42,7 +42,7 @@ function sentEventsOfType(string $type): array
  */
 function fakePanel(mixed $response = null): void
 {
-    Http::swap(new Factory);
+    Http::swap(new Factory(app('events')));
     Http::fake($response ?? ['*' => Http::response(['accepted' => 1], 202)]);
 }
 

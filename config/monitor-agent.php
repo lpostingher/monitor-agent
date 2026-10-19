@@ -31,8 +31,8 @@ return [
     // Events beyond this are dropped until the next batch is sent.
     'max_buffer' => 1000,
 
-    // Encoded size kept in memory, below the panel's 5 MB batch limit. Logs may
-    // use two thirds of it, so exceptions and jobs still fit after a log burst.
+    // Encoded size kept in memory, below the panel's 5 MB batch limit. Logs, queries
+    // and outgoing calls may use two thirds of it, so exceptions still fit after a burst.
     'max_buffer_bytes' => 4_500_000,
 
     // Seconds to stop sending after the panel fails, rate limits or times out.

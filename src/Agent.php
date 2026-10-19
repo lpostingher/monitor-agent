@@ -15,6 +15,12 @@ use Throwable;
 class Agent
 {
     /**
+     * Event types that may only fill two thirds of the buffer, so a burst of them
+     * never pushes out the exceptions, jobs and requests recorded afterwards.
+     */
+    private const HIGH_VOLUME_TYPES = ['log', 'query', 'outgoing_request'];
+
+    /**
      * @var array<int, array<string, mixed>>
      */
     private array $events = [];
@@ -46,7 +52,7 @@ class Agent
         $size = strlen((string) json_encode($event, JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR));
         $budget = (int) config('monitor-agent.max_buffer_bytes');
 
-        if (($event['type'] ?? null) === 'log') {
+        if (in_array($event['type'] ?? null, self::HIGH_VOLUME_TYPES, true)) {
             $budget = intdiv($budget * 2, 3);
         }
 
