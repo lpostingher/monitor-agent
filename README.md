@@ -38,12 +38,12 @@ Laravel Octane is not supported yet.
 
 ## Configuration
 
-| Variable | Default | |
-|---|---|---|
-| `MONITOR_URL` | | Panel URL |
-| `MONITOR_TOKEN` | | Project ingest token |
-| `MONITOR_ENABLED` | `true` (`false` when `APP_ENV=local`) | Turn the agent on or off |
-| `MONITOR_LOG_LEVEL` | `info` | Lowest log level reported |
+| Variable            | Default                               |                           |
+| ------------------- | ------------------------------------- | ------------------------- |
+| `MONITOR_URL`       |                                       | Panel URL                 |
+| `MONITOR_TOKEN`     |                                       | Project ingest token      |
+| `MONITOR_ENABLED`   | `true` (`false` when `APP_ENV=local`) | Turn the agent on or off  |
+| `MONITOR_LOG_LEVEL` | `info`                                | Lowest log level reported |
 
 The agent is always off while running tests. Publish the configuration file to change batch sizes, timeouts or redacted keys:
 
