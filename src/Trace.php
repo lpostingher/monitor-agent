@@ -21,10 +21,10 @@ class Trace
     }
 
     /**
-     * Start a new trace for the next unit of work.
+     * Start a new trace for the next unit of work, or continue one handed over by a parent process.
      */
-    public function start(): string
+    public function start(?string $id = null): string
     {
-        return $this->id = (string) Str::uuid();
+        return $this->id = $id ?? (string) Str::uuid();
     }
 }

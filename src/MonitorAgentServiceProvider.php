@@ -4,6 +4,7 @@ namespace Postingher\MonitorAgent;
 
 use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Console\Events\ScheduledBackgroundTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskFailed;
 use Illuminate\Console\Events\ScheduledTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskStarting;
@@ -80,6 +81,7 @@ class MonitorAgentServiceProvider extends ServiceProvider
         Event::listen(ScheduledTaskStarting::class, [ScheduledTaskCollector::class, 'starting']);
         Event::listen(ScheduledTaskFinished::class, [ScheduledTaskCollector::class, 'finished']);
         Event::listen(ScheduledTaskFailed::class, [ScheduledTaskCollector::class, 'failed']);
+        Event::listen(ScheduledBackgroundTaskFinished::class, [ScheduledTaskCollector::class, 'backgroundFinished']);
         Event::listen(JobProcessing::class, [JobCollector::class, 'processing']);
         Event::listen(JobProcessed::class, [JobCollector::class, 'processed']);
         Event::listen(JobFailed::class, [JobCollector::class, 'failed']);

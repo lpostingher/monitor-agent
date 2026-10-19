@@ -4,6 +4,7 @@ namespace Postingher\MonitorAgent\Collectors;
 
 use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Support\Facades\Context;
 use Postingher\MonitorAgent\Agent;
 use Postingher\MonitorAgent\Support\Timestamp;
 use Postingher\MonitorAgent\Trace;
@@ -48,7 +49,7 @@ class CommandCollector
             }
 
             if ($this->running === [] && app()->runningInConsole()) {
-                $this->trace->start();
+                $this->trace->start(Context::getHidden(ScheduledTaskCollector::TRACE_CONTEXT_KEY));
                 $this->exceptions->withContext(['command' => $event->command]);
             }
 

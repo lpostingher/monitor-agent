@@ -45,3 +45,17 @@ function fakePanel(mixed $response = null): void
     Http::swap(new Factory);
     Http::fake($response ?? ['*' => Http::response(['accepted' => 1], 202)]);
 }
+
+/**
+ * Flush the agent and get every event sent, or none when nothing was sent.
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function sentEventsOrNone(): array
+{
+    app(Agent::class)->flush();
+
+    return Http::recorded()
+        ->flatMap(fn (array $pair) => json_decode(gzdecode($pair[0]->body()), true)['events'])
+        ->all();
+}

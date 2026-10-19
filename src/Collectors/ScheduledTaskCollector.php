@@ -3,10 +3,12 @@
 namespace Postingher\MonitorAgent\Collectors;
 
 use Illuminate\Console\Application;
+use Illuminate\Console\Events\ScheduledBackgroundTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskFailed;
 use Illuminate\Console\Events\ScheduledTaskFinished;
 use Illuminate\Console\Events\ScheduledTaskStarting;
 use Illuminate\Console\Scheduling\Event;
+use Illuminate\Support\Facades\Context;
 use Postingher\MonitorAgent\Agent;
 use Postingher\MonitorAgent\Support\Timestamp;
 use Postingher\MonitorAgent\Trace;
@@ -19,6 +21,11 @@ use Throwable;
  */
 class ScheduledTaskCollector
 {
+    /**
+     * Hidden context key carrying a task's trace to the process that runs its command.
+     */
+    public const TRACE_CONTEXT_KEY = 'monitor_trace_id';
+
     /**
      * Tasks in progress, keyed by task object id.
      *
@@ -54,7 +61,8 @@ class ScheduledTaskCollector
     public function starting(ScheduledTaskStarting $event): void
     {
         try {
-            $this->trace->start();
+            // Command tasks run in a child process; Laravel hands the context over to it.
+            Context::addHidden(self::TRACE_CONTEXT_KEY, $this->trace->start());
             $this->exceptions->withContext(['scheduled_task' => self::nameOf($event->task)]);
             $this->running[spl_object_id($event->task)] = true;
         } catch (Throwable) {
@@ -67,7 +75,27 @@ class ScheduledTaskCollector
      */
     public function finished(ScheduledTaskFinished $event): void
     {
-        $this->finish($event->task, ($event->task->exitCode ?? 0) === 0 ? 'processed' : 'failed', $event->runtime);
+        $task = $event->task;
+
+        // Not a real run: the previous one still holds the lock, or the task
+        // went to the background and reports from its own process later.
+        if ($task->skippedBecauseOverlapping || $task->runInBackground) {
+            unset($this->running[spl_object_id($task)]);
+
+            return;
+        }
+
+        $this->finish($task, ($task->exitCode ?? 0) === 0 ? 'processed' : 'failed', $event->runtime);
+    }
+
+    /**
+     * Report a background task once its process has finished.
+     */
+    public function backgroundFinished(ScheduledBackgroundTaskFinished $event): void
+    {
+        $this->running[spl_object_id($event->task)] = true;
+
+        $this->finish($event->task, ($event->task->exitCode ?? 0) === 0 ? 'processed' : 'failed', null);
     }
 
     /**
