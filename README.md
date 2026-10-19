@@ -24,6 +24,8 @@ That's it. The service provider is discovered automatically.
 - **Requests**: method, route pattern, controller action, status, duration and the authenticated user's id. The URL is sent without its query string, and the `/up` health check is skipped.
 - **Queries** run by your code: the SQL with its placeholders (never the bound values, and `in (...)` lists collapsed), duration, connection and the file and line that ran it. Framework housekeeping queries with no application code behind them (queue polling, sessions, cache) are skipped.
 - **Outgoing requests** made with Laravel's `Http` client: method, URL without its query string (token-like path segments such as webhook secrets are masked), status and duration.
+- **Notifications and mail**: notifications by class and channel (sent or failed) and mailables sent directly. Never recipients, subjects or content.
+- **Cache**: hits, misses, writes and forgets summed per key, with ids, hashes, tokens and emails in keys replaced by `*`.
 - **Artisan commands**: name (never the arguments), exit code and duration. Long-running commands such as `queue:work` and `schedule:run` are skipped.
 - **Scheduled tasks**: every run with its cron expression, whether it succeeded, and its duration.
 - **Queued jobs**: every attempt with its status (processed, failed or released), duration, queue and attempt number.
@@ -31,6 +33,22 @@ That's it. The service provider is discovered automatically.
 Every request, job and command gets a trace id, so the panel shows the logs written alongside an exception.
 
 Values whose keys contain `password`, `token`, `secret`, `authorization`, `cookie`, `api-key` and similar words are replaced by `[redacted]` before leaving the application. Database errors are sent without their bound values, and URLs with sensitive route parameters are sent as the route pattern. Other exception messages are sent as they are.
+
+## Marking deploys
+
+Run this after each deploy, from your deploy pipeline (not the container entrypoint, where every restart and replica would count as a deploy), after migrations:
+
+```bash
+php artisan monitor:deploy --ref=$GITHUB_SHA
+```
+
+For a Docker Swarm deploy over SSH, after the `migrate` step:
+
+```bash
+docker exec "$CONTAINER_ID" php artisan monitor:deploy --ref=${{ github.sha }}
+```
+
+The panel shows the last deploy and flags issues first seen after it. The same ref sent twice counts once.
 
 ## Impact on your application
 

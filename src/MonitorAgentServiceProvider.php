@@ -2,6 +2,10 @@
 
 namespace Postingher\MonitorAgent;
 
+use Illuminate\Cache\Events\CacheHit;
+use Illuminate\Cache\Events\CacheMissed;
+use Illuminate\Cache\Events\KeyForgotten;
+use Illuminate\Cache\Events\KeyWritten;
 use Illuminate\Console\Events\CommandFinished;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Console\Events\ScheduledBackgroundTaskFinished;
@@ -14,6 +18,10 @@ use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Http\Client\Events\ConnectionFailed;
 use Illuminate\Http\Client\Events\ResponseReceived;
 use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Mail\Events\MessageSent;
+use Illuminate\Notifications\Events\NotificationFailed;
+use Illuminate\Notifications\Events\NotificationSending;
+use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
@@ -22,14 +30,17 @@ use Illuminate\Queue\Events\Looping;
 use Illuminate\Queue\Events\WorkerStopping;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use Postingher\MonitorAgent\Collectors\CacheCollector;
 use Postingher\MonitorAgent\Collectors\CommandCollector;
 use Postingher\MonitorAgent\Collectors\ExceptionCollector;
 use Postingher\MonitorAgent\Collectors\JobCollector;
 use Postingher\MonitorAgent\Collectors\LogCollector;
+use Postingher\MonitorAgent\Collectors\NotificationCollector;
 use Postingher\MonitorAgent\Collectors\OutgoingRequestCollector;
 use Postingher\MonitorAgent\Collectors\QueryCollector;
 use Postingher\MonitorAgent\Collectors\RequestCollector;
 use Postingher\MonitorAgent\Collectors\ScheduledTaskCollector;
+use Postingher\MonitorAgent\Console\DeployCommand;
 use Postingher\MonitorAgent\Support\ContextSanitizer;
 use Postingher\MonitorAgent\Support\StackTraceFormatter;
 use Throwable;
@@ -59,6 +70,8 @@ class MonitorAgentServiceProvider extends ServiceProvider
         $this->app->singleton(ScheduledTaskCollector::class);
         $this->app->singleton(QueryCollector::class);
         $this->app->singleton(OutgoingRequestCollector::class);
+        $this->app->singleton(NotificationCollector::class);
+        $this->app->singleton(CacheCollector::class);
     }
 
     /**
@@ -67,6 +80,10 @@ class MonitorAgentServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->publishes([__DIR__.'/../config/monitor-agent.php' => config_path('monitor-agent.php')], 'monitor-agent-config');
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([DeployCommand::class]);
+        }
 
         if (! $this->isEnabled()) {
             return;
@@ -86,6 +103,12 @@ class MonitorAgentServiceProvider extends ServiceProvider
         Event::listen(QueryExecuted::class, [QueryCollector::class, 'handle']);
         Event::listen(ResponseReceived::class, [OutgoingRequestCollector::class, 'received']);
         Event::listen(ConnectionFailed::class, [OutgoingRequestCollector::class, 'failed']);
+        Event::listen(NotificationSending::class, [NotificationCollector::class, 'sending']);
+        Event::listen(NotificationSent::class, [NotificationCollector::class, 'sent']);
+        Event::listen(NotificationFailed::class, [NotificationCollector::class, 'failed']);
+        Event::listen(MessageSent::class, [NotificationCollector::class, 'messageSent']);
+        Event::listen([CacheHit::class, CacheMissed::class, KeyWritten::class, KeyForgotten::class], [CacheCollector::class, 'handle']);
+        $this->app->make(Agent::class)->beforeFlush(fn () => $this->app->make(CacheCollector::class)->drain());
         Event::listen(CommandStarting::class, [CommandCollector::class, 'starting']);
         Event::listen(CommandFinished::class, [CommandCollector::class, 'finished']);
         Event::listen(ScheduledTaskStarting::class, [ScheduledTaskCollector::class, 'starting']);

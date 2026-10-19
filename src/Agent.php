@@ -18,7 +18,7 @@ class Agent
      * Event types that may only fill two thirds of the buffer (by count and by size),
      * so a burst of them never pushes out the exceptions, jobs and requests recorded afterwards.
      */
-    private const HIGH_VOLUME_TYPES = ['log', 'query', 'outgoing_request'];
+    private const HIGH_VOLUME_TYPES = ['log', 'query', 'outgoing_request', 'cache'];
 
     /**
      * @var array<int, array<string, mixed>>
@@ -30,6 +30,13 @@ class Agent
     private int $bytes = 0;
 
     private bool $holdingFlushes = false;
+
+    /**
+     * Callbacks that add their summarized events right before a batch is sent.
+     *
+     * @var array<int, callable(): void>
+     */
+    private array $beforeFlush = [];
 
     private int $lastFlushAt;
 
@@ -98,11 +105,33 @@ class Agent
     }
 
     /**
+     * Run a callback right before each batch is sent, for collectors that summarize in memory.
+     *
+     * @param  callable(): void  $callback
+     */
+    public function beforeFlush(callable $callback): void
+    {
+        $this->beforeFlush[] = $callback;
+    }
+
+    /**
      * Send every buffered event. Failures are ignored and the events dropped.
      */
     public function flush(): void
     {
-        if ($this->events === [] || $this->flushing) {
+        if ($this->flushing) {
+            return;
+        }
+
+        foreach ($this->beforeFlush as $callback) {
+            try {
+                $callback();
+            } catch (Throwable) {
+                // Never let monitoring break the application.
+            }
+        }
+
+        if ($this->events === []) {
             return;
         }
 
