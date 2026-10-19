@@ -56,7 +56,7 @@ class LogCollector
     private function isReported(string $level): bool
     {
         $severity = array_search($level, self::LEVELS, true);
-        $minimum = array_search(strtolower((string) config('monitor.log_level')), self::LEVELS, true);
+        $minimum = array_search(strtolower((string) config('monitor-agent.log_level')), self::LEVELS, true);
 
         return $severity !== false && $severity >= ($minimum === false ? 1 : $minimum);
     }

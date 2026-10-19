@@ -22,12 +22,12 @@ class HttpTransport
                 'events' => $events,
             ], JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR);
 
-            Http::withToken((string) config('monitor.token'))
+            Http::withToken((string) config('monitor-agent.token'))
                 ->withHeaders(['Content-Encoding' => 'gzip', 'Accept' => 'application/json'])
-                ->connectTimeout((int) config('monitor.connect_timeout'))
-                ->timeout((int) config('monitor.timeout'))
+                ->connectTimeout((int) config('monitor-agent.connect_timeout'))
+                ->timeout((int) config('monitor-agent.timeout'))
                 ->withBody((string) gzencode((string) $payload), 'application/json')
-                ->post(rtrim((string) config('monitor.url'), '/').'/api/ingest');
+                ->post(rtrim((string) config('monitor-agent.url'), '/').'/api/ingest');
         } catch (Throwable) {
             // The panel being unreachable must never affect the monitored application.
         }

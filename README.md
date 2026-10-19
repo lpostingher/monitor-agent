@@ -45,7 +45,7 @@ Values whose keys contain `password`, `token`, `secret`, `authorization`, `cooki
 The agent is always off while running tests. Publish the configuration file to change batch sizes, timeouts or redacted keys:
 
 ```bash
-php artisan vendor:publish --tag=monitor-config
+php artisan vendor:publish --tag=monitor-agent-config
 ```
 
 ## License

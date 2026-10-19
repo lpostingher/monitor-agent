@@ -38,8 +38,8 @@ abstract class TestCase extends Orchestra
     protected function defineEnvironment($app): void
     {
         $app['env'] = 'production';
-        $app['config']->set('monitor.enabled', true);
-        $app['config']->set('monitor.url', 'https://monitor.test');
-        $app['config']->set('monitor.token', $this->monitorToken);
+        $app['config']->set('monitor-agent.enabled', true);
+        $app['config']->set('monitor-agent.url', 'https://monitor.test');
+        $app['config']->set('monitor-agent.token', $this->monitorToken);
     }
 }

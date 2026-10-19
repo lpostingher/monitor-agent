@@ -26,17 +26,17 @@ class MonitorAgentServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../config/monitor.php', 'monitor');
+        $this->mergeConfigFrom(__DIR__.'/../config/monitor-agent.php', 'monitor-agent');
 
         $this->app->singleton(Agent::class);
         $this->app->singleton(Trace::class);
         $this->app->singleton(ContextSanitizer::class, fn () => new ContextSanitizer(
-            array_map(strtolower(...), (array) config('monitor.redact_keys')),
-            (int) config('monitor.max_context_bytes'),
+            array_map(strtolower(...), (array) config('monitor-agent.redact_keys')),
+            (int) config('monitor-agent.max_context_bytes'),
         ));
         $this->app->singleton(StackTraceFormatter::class, fn () => new StackTraceFormatter(
             $this->app->basePath(),
-            (int) config('monitor.max_frames'),
+            (int) config('monitor-agent.max_frames'),
         ));
         $this->app->singleton(ExceptionCollector::class);
         $this->app->singleton(JobCollector::class);
@@ -47,7 +47,7 @@ class MonitorAgentServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        $this->publishes([__DIR__.'/../config/monitor.php' => config_path('monitor.php')], 'monitor-config');
+        $this->publishes([__DIR__.'/../config/monitor-agent.php' => config_path('monitor-agent.php')], 'monitor-agent-config');
 
         if (! $this->isEnabled()) {
             return;
@@ -96,9 +96,9 @@ class MonitorAgentServiceProvider extends ServiceProvider
      */
     public function isEnabled(): bool
     {
-        return (bool) config('monitor.enabled')
-            && filled(config('monitor.url'))
-            && filled(config('monitor.token'))
+        return (bool) config('monitor-agent.enabled')
+            && filled(config('monitor-agent.url'))
+            && filled(config('monitor-agent.token'))
             && ! $this->app->environment('testing');
     }
 }

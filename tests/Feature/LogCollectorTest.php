@@ -32,7 +32,7 @@ test('skips levels below the configured minimum', function () {
 });
 
 test('reports debug logs when the minimum level is debug', function () {
-    config(['monitor.log_level' => 'debug']);
+    config(['monitor-agent.log_level' => 'debug']);
 
     Log::debug('Noise');
 

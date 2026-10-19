@@ -35,7 +35,7 @@ class Agent
      */
     public function record(array $event): void
     {
-        if ($this->flushing || count($this->events) >= (int) config('monitor.max_buffer')) {
+        if ($this->flushing || count($this->events) >= (int) config('monitor-agent.max_buffer')) {
             return;
         }
 
@@ -51,8 +51,8 @@ class Agent
      */
     public function flushIfDue(): void
     {
-        $isFull = count($this->events) >= (int) config('monitor.batch_size');
-        $isStale = Date::now()->getTimestamp() - $this->lastFlushAt >= (int) config('monitor.flush_interval');
+        $isFull = count($this->events) >= (int) config('monitor-agent.batch_size');
+        $isStale = Date::now()->getTimestamp() - $this->lastFlushAt >= (int) config('monitor-agent.flush_interval');
 
         if ($isFull || ($isStale && $this->events !== [])) {
             $this->flush();
