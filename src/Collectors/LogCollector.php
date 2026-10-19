@@ -5,6 +5,7 @@ namespace Postingher\MonitorAgent\Collectors;
 use Illuminate\Log\Events\MessageLogged;
 use Postingher\MonitorAgent\Agent;
 use Postingher\MonitorAgent\Support\ContextSanitizer;
+use Postingher\MonitorAgent\Support\ExceptionMessage;
 use Postingher\MonitorAgent\Support\Timestamp;
 use Postingher\MonitorAgent\Trace;
 use Stringable;
@@ -45,7 +46,7 @@ class LogCollector
                 'trace_id' => $this->trace->id(),
                 'logged_at' => Timestamp::now(),
                 'level' => $level,
-                'message' => mb_strcut($this->messageText($event->message), 0, self::MAX_MESSAGE_BYTES),
+                'message' => mb_strcut($this->messageText($event), 0, self::MAX_MESSAGE_BYTES),
                 'context' => $this->sanitizer->sanitize($event->context),
             ]);
         } catch (Throwable) {
@@ -61,10 +62,20 @@ class LogCollector
         return $severity !== false && $severity >= ($minimum === false ? 1 : $minimum);
     }
 
-    private function messageText(mixed $message): string
+    /**
+     * Get the message as text, without the data a logged exception's message could leak.
+     */
+    private function messageText(MessageLogged $event): string
     {
-        return is_scalar($message) || $message instanceof Stringable
-            ? (string) $message
-            : (string) json_encode($message, JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+        $exception = $event->context['exception'] ?? null;
+        $message = $event->message;
+
+        $text = match (true) {
+            $exception instanceof Throwable && $message === $exception->getMessage() => ExceptionMessage::for($exception),
+            is_scalar($message) || $message instanceof Stringable => (string) $message,
+            default => (string) json_encode($message, JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR),
+        };
+
+        return $text === '' ? '(empty message)' : $text;
     }
 }

@@ -4,6 +4,7 @@ namespace Postingher\MonitorAgent\Collectors;
 
 use Postingher\MonitorAgent\Agent;
 use Postingher\MonitorAgent\Support\ContextSanitizer;
+use Postingher\MonitorAgent\Support\ExceptionMessage;
 use Postingher\MonitorAgent\Support\StackTraceFormatter;
 use Postingher\MonitorAgent\Support\Timestamp;
 use Postingher\MonitorAgent\Trace;
@@ -16,6 +17,11 @@ class ExceptionCollector
      * Longest message stored by the panel, in bytes.
      */
     private const MAX_MESSAGE_BYTES = 65535;
+
+    /**
+     * Longest exception class or file path stored by the panel.
+     */
+    private const MAX_NAME_BYTES = 255;
 
     /**
      * Extra context describing the current unit of work, such as the job being processed.
@@ -59,10 +65,10 @@ class ExceptionCollector
                 'type' => 'exception',
                 'trace_id' => $this->trace->id(),
                 'occurred_at' => Timestamp::now(),
-                'class' => $exception::class,
-                'message' => mb_strcut($exception->getMessage(), 0, self::MAX_MESSAGE_BYTES),
+                'class' => mb_strcut($exception::class, 0, self::MAX_NAME_BYTES),
+                'message' => mb_strcut(ExceptionMessage::for($exception), 0, self::MAX_MESSAGE_BYTES),
                 'code' => (string) $exception->getCode(),
-                'file' => $this->formatter->relativePath($exception->getFile()),
+                'file' => mb_strcut($this->formatter->relativePath($exception->getFile()), 0, self::MAX_NAME_BYTES),
                 'line' => $exception->getLine(),
                 'trace' => $this->formatter->format($exception),
                 'context' => $this->sanitizer->sanitize($this->context()),
@@ -102,9 +108,12 @@ class ExceptionCollector
         $context = $this->context;
 
         if ($route !== null) {
+            $hasSecretParameters = collect($route->parameterNames())
+                ->contains(fn (string $name): bool => $this->sanitizer->isSensitive($name));
+
             $context['request'] = [
                 'method' => $request->method(),
-                'url' => $request->url(),
+                'url' => $hasSecretParameters ? $route->uri() : $request->url(),
                 'route' => $route->getName() ?? $route->uri(),
             ];
         } elseif ($context === [] && app()->runningInConsole()) {

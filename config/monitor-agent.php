@@ -50,7 +50,8 @@ return [
     // Context keys containing any of these words are replaced by "[redacted]".
     'redact_keys' => [
         'password', 'password_confirmation', 'token', 'secret', 'authorization', 'cookie',
-        'api_key', 'apikey', 'access_token', 'refresh_token', 'credit_card', 'card_number', 'cvv',
+        'api_key', 'api-key', 'apikey', 'private_key', 'pwd', 'access_token', 'refresh_token',
+        'credit_card', 'card_number', 'cvv',
     ],
 
 ];

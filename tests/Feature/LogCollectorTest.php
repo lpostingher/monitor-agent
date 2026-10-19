@@ -68,3 +68,19 @@ test('listens to logs only when enabled', function () {
 
     expect($collectorListeners())->toBeEmpty();
 });
+
+test('empty messages are sent with a placeholder the panel accepts', function () {
+    Log::warning('');
+
+    expect(sentEvents()[0]['message'])->toBe('(empty message)');
+});
+
+test('redacts hyphenated api keys, private keys and pwd fields', function () {
+    Log::info('Webhook', ['headers' => ['x-api-key' => 'k1'], 'private_key' => 'k2', 'db_pwd' => 'k3']);
+
+    expect(sentEvents()[0]['context'])->toBe([
+        'headers' => ['x-api-key' => '[redacted]'],
+        'private_key' => '[redacted]',
+        'db_pwd' => '[redacted]',
+    ]);
+});

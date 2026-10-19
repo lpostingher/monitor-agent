@@ -1,8 +1,10 @@
 <?php
 
 use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Route;
+use Postingher\MonitorAgent\Collectors\ExceptionCollector;
 use Postingher\MonitorAgent\Support\StackTraceFormatter;
 use Postingher\MonitorAgent\Tests\Fixtures\DecoratedExceptionHandler;
 use Postingher\MonitorAgent\Tests\Fixtures\IgnoredException;
@@ -83,4 +85,45 @@ test('reports once when another package decorates the exception handler', functi
     report(new RuntimeException('Once'));
 
     expect(sentEventsOfType('exception'))->toHaveCount(1);
+});
+
+test('database errors are sent without the bound values', function () {
+    $exception = new QueryException(
+        'sqlite',
+        'insert into users (email, password) values (?, ?)',
+        ['ana@example.com', '$2y$12$hashedsecret'],
+        new PDOException('UNIQUE constraint failed: users.email'),
+    );
+
+    report($exception);
+
+    $events = sentEvents();
+    $sent = json_encode($events);
+    expect($sent)->not->toContain('ana@example.com')
+        ->and($sent)->not->toContain('hashedsecret')
+        ->and(collect($events)->firstWhere('type', 'exception')['message'])
+        ->toBe('UNIQUE constraint failed: users.email (SQL: insert into users (email, password) values (?, ?))');
+});
+
+test('long class names and file paths are cut to what the panel stores', function () {
+    $exception = new RuntimeException('Boom');
+    $formatter = Mockery::mock(StackTraceFormatter::class);
+    $formatter->shouldReceive('relativePath')->andReturn('/'.str_repeat('a', 300).'.php');
+    $formatter->shouldReceive('format')->andReturn([]);
+    app()->instance(StackTraceFormatter::class, $formatter);
+    app()->forgetInstance(ExceptionCollector::class);
+
+    report($exception);
+
+    expect(strlen(sentEventsOfType('exception')[0]['file']))->toBe(255);
+});
+
+test('secret route parameters are kept out of the reported url', function () {
+    Route::get('/reset-password/{token}', fn () => throw new RuntimeException('Boom'))->name('password.reset');
+
+    $this->get('/reset-password/super-secret-token');
+
+    $request = sentEventsOfType('exception')[0]['context']['request'];
+    expect($request['url'])->toBe('reset-password/{token}')
+        ->and(json_encode(sentEvents()))->not->toContain('super-secret-token');
 });

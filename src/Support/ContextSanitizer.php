@@ -65,7 +65,7 @@ class ContextSanitizer
     {
         return match (true) {
             is_array($value) => $depth >= self::MAX_DEPTH ? '[depth]' : $this->sanitizeArray($value, $depth + 1),
-            $value instanceof Throwable => ['class' => $value::class, 'message' => $value->getMessage()],
+            $value instanceof Throwable => ['class' => $value::class, 'message' => ExceptionMessage::for($value)],
             $value instanceof Closure => '[closure]',
             $value instanceof JsonSerializable => $this->sanitizeValue($value->jsonSerialize(), $depth),
             $value instanceof Arrayable => $this->sanitizeValue($value->toArray(), $depth),
@@ -75,7 +75,10 @@ class ContextSanitizer
         };
     }
 
-    private function isSensitive(string $key): bool
+    /**
+     * Determine whether a key names a value that must be redacted.
+     */
+    public function isSensitive(string $key): bool
     {
         $key = strtolower($key);
 
