@@ -18,7 +18,8 @@ use Throwable;
 class NotificationCollector
 {
     /**
-     * Whether a notification is being sent, so the mail it produces is not counted again.
+     * Whether a mail notification is being sent, so the one mail it produces is not counted again.
+     * Consumed by that mail, so a send that never finishes can hide at most one mailable.
      */
     private bool $sendingNotification = false;
 
@@ -29,7 +30,7 @@ class NotificationCollector
 
     public function sending(NotificationSending $event): void
     {
-        $this->sendingNotification = true;
+        $this->sendingNotification = $event->channel === 'mail';
     }
 
     public function sent(NotificationSent $event): void
@@ -49,7 +50,15 @@ class NotificationCollector
      */
     public function messageSent(MessageSent $event): void
     {
-        if ($this->sendingNotification || isset($event->data['__laravel_notification'])) {
+        if (isset($event->data['__laravel_notification'])) {
+            $this->sendingNotification = false;
+
+            return;
+        }
+
+        if ($this->sendingNotification) {
+            $this->sendingNotification = false;
+
             return;
         }
 

@@ -22,8 +22,6 @@ class CacheCollector
      */
     private const MAX_KEYS = 500;
 
-    private const IGNORED_PREFIXES = ['illuminate:', 'monitor-agent:'];
-
     /**
      * @var array<string, array{hits: int, misses: int, writes: int, forgets: int}>
      */
@@ -36,13 +34,11 @@ class CacheCollector
      */
     public static function normalize(string $key): string
     {
-        $key = (string) preg_replace('/[^\s:\/]+@[^\s:\/]+/', '*', $key);
+        if (str_contains($key, '@')) {
+            $key = (string) preg_replace('/[^\s:\/]+@[^\s:\/]+/', '*', $key);
+        }
 
-        return (string) preg_replace_callback(
-            '#[^:/._\-]+#',
-            fn (array $match): string => preg_match('/\d/', $match[0]) || strlen($match[0]) > 20 ? '*' : $match[0],
-            $key,
-        );
+        return (string) preg_replace('#[^:/._\-]*\d[^:/._\-]*|[^:/._\-]{21,}#', '*', $key);
     }
 
     /**
@@ -51,7 +47,7 @@ class CacheCollector
     public function handle(CacheEvent $event): void
     {
         try {
-            if ($this->agent->isFlushing() || str_starts_with($event->key, self::IGNORED_PREFIXES[0]) || str_starts_with($event->key, self::IGNORED_PREFIXES[1])) {
+            if ($this->agent->isFlushing() || str_starts_with($event->key, 'illuminate:') || str_starts_with($event->key, 'monitor-agent:')) {
                 return;
             }
 

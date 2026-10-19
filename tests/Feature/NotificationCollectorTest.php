@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Notifications\Events\NotificationSending;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Postingher\MonitorAgent\Tests\Fixtures\BrokenChannelNotification;
@@ -44,4 +45,21 @@ test('failed notifications are reported as failed', function () {
 
     expect(sentEventsOfType('notification')[0])
         ->toMatchArray(['class' => BrokenChannelNotification::class, 'status' => 'failed']);
+});
+
+test('a mail notification that never finishes sending does not hide later mailables', function () {
+    event(new NotificationSending(new stdClass, new OrderShipped, 'mail'));
+
+    Mail::to('ana@example.com')->send(new InvoiceMail);
+    Mail::to('ana@example.com')->send(new InvoiceMail);
+
+    expect(collect(sentEventsOfType('notification'))->where('class', InvoiceMail::class))->toHaveCount(1);
+});
+
+test('a database notification does not hide a mailable sent meanwhile', function () {
+    event(new NotificationSending(new stdClass, new OrderShipped, 'database'));
+
+    Mail::to('ana@example.com')->send(new InvoiceMail);
+
+    expect(sentEventsOfType('notification')[0]['class'])->toBe(InvoiceMail::class);
 });
