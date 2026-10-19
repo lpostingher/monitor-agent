@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Contracts\Support\Arrayable;
 use Postingher\MonitorAgent\Support\ContextSanitizer;
 
 function sanitizer(int $maxBytes = 10240): ContextSanitizer
@@ -72,4 +73,47 @@ test('oversized context is replaced by a truncation marker', function () {
 
 test('empty context becomes null', function () {
     expect(sanitizer()->sanitize([]))->toBeNull();
+});
+
+test('keeps only the first items of large arrays and collections', function () {
+    $context = sanitizer(1_000_000)->sanitize([
+        'ids' => range(1, 1000),
+        'rows' => collect(range(1, 1000)),
+    ]);
+
+    expect($context['ids'])->toHaveCount(51)
+        ->and($context['ids']['…'])->toBe('950 more')
+        ->and($context['rows'])->toHaveCount(51)
+        ->and($context['rows']['…'])->toBe('950 more');
+});
+
+test('large collections are not converted in full', function () {
+    $converted = 0;
+    $rows = collect(range(1, 1000))->map(fn ($id) => new class($id, $converted) implements Arrayable
+    {
+        public function __construct(private int $id, private int &$converted) {}
+
+        public function toArray(): array
+        {
+            $this->converted++;
+
+            return ['id' => $this->id];
+        }
+    });
+
+    sanitizer(1_000_000)->sanitize(['rows' => $rows]);
+
+    expect($converted)->toBeLessThanOrEqual(50);
+});
+
+test('objects that serialize to themselves stop at the depth limit', function () {
+    $loop = new class implements JsonSerializable
+    {
+        public function jsonSerialize(): mixed
+        {
+            return $this;
+        }
+    };
+
+    expect(sanitizer()->sanitize(['loop' => $loop]))->toBe(['loop' => '[depth]']);
 });

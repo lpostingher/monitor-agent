@@ -3,7 +3,9 @@
 namespace Postingher\MonitorAgent\Support;
 
 use Closure;
+use Countable;
 use Illuminate\Contracts\Support\Arrayable;
+use Illuminate\Support\Enumerable;
 use JsonSerializable;
 use Throwable;
 
@@ -14,6 +16,11 @@ use Throwable;
 class ContextSanitizer
 {
     private const MAX_DEPTH = 5;
+
+    /**
+     * Items kept per array or collection; the rest are summarized.
+     */
+    private const MAX_ITEMS = 50;
 
     /**
      * @param  array<int, string>  $redactKeys
@@ -48,14 +55,20 @@ class ContextSanitizer
      * @param  array<array-key, mixed>  $values
      * @return array<array-key, mixed>
      */
-    private function sanitizeArray(array $values, int $depth): array
+    private function sanitizeArray(array $values, int $depth, ?int $total = null): array
     {
         $sanitized = [];
 
-        foreach ($values as $key => $value) {
+        foreach (array_slice($values, 0, self::MAX_ITEMS, true) as $key => $value) {
             $sanitized[$key] = $this->isSensitive((string) $key)
                 ? '[redacted]'
                 : $this->sanitizeValue($value, $depth);
+        }
+
+        $total ??= count($values);
+
+        if ($total > self::MAX_ITEMS) {
+            $sanitized['…'] = ($total - self::MAX_ITEMS).' more';
         }
 
         return $sanitized;
@@ -63,12 +76,21 @@ class ContextSanitizer
 
     private function sanitizeValue(mixed $value, int $depth): mixed
     {
+        if ((is_array($value) || is_object($value)) && $depth >= self::MAX_DEPTH) {
+            return '[depth]';
+        }
+
         return match (true) {
-            is_array($value) => $depth >= self::MAX_DEPTH ? '[depth]' : $this->sanitizeArray($value, $depth + 1),
+            is_array($value) => $this->sanitizeArray($value, $depth + 1),
             $value instanceof Throwable => ['class' => $value::class, 'message' => ExceptionMessage::for($value)],
             $value instanceof Closure => '[closure]',
-            $value instanceof JsonSerializable => $this->sanitizeValue($value->jsonSerialize(), $depth),
-            $value instanceof Arrayable => $this->sanitizeValue($value->toArray(), $depth),
+            $value instanceof Enumerable => $this->sanitizeArray(
+                $value->take(self::MAX_ITEMS)->all(),
+                $depth + 1,
+                $value instanceof Countable ? count($value) : null,
+            ),
+            $value instanceof JsonSerializable => $this->sanitizeValue($value->jsonSerialize(), $depth + 1),
+            $value instanceof Arrayable => $this->sanitizeValue($value->toArray(), $depth + 1),
             is_object($value) => '[object '.$value::class.']',
             is_resource($value) || gettype($value) === 'resource (closed)' => '[resource]',
             default => $value,

@@ -25,13 +25,16 @@ That's it. The service provider is discovered automatically.
 
 Every request, job and command gets a trace id, so the panel shows the logs written alongside an exception.
 
-Values whose keys contain `password`, `token`, `secret`, `authorization`, `cookie` and similar words are replaced by `[redacted]` before leaving the application.
+Values whose keys contain `password`, `token`, `secret`, `authorization`, `cookie`, `api-key` and similar words are replaced by `[redacted]` before leaving the application. Database errors are sent without their bound values, and URLs with sensitive route parameters are sent as the route pattern. Other exception messages are sent as they are.
 
 ## Impact on your application
 
 - Events are kept in memory and sent in a single gzip request **after the response has been sent**.
 - Queue workers and other long-running commands send a batch every 100 events or 10 seconds.
-- If the panel is slow or unreachable the batch is dropped after a short timeout. The agent never throws and never blocks a response.
+- If the panel is slow or unreachable the batch is dropped after a short timeout, and sending pauses for 30 seconds. The agent never throws and never blocks a response.
+- Memory stays bounded: at most 1000 events or 4.5 MB are buffered at once.
+
+Laravel Octane is not supported yet.
 
 ## Configuration
 
