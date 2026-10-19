@@ -30,12 +30,13 @@ test('reports queries without their bound values, with the code that ran them', 
         ->and(json_encode($events->all()))->not->toContain('ana@example.com');
 });
 
-test('a burst of queries never pushes an exception out of the batch', function () {
-    config(['monitor-agent.max_buffer_bytes' => 30_000, 'monitor-agent.batch_size' => 10_000]);
+test('a burst of large queries fills only its share of the buffer bytes', function () {
+    config(['monitor-agent.max_buffer_bytes' => 200_000]);
     app()['env'] = 'production';
-    Route::get('/report', function () {
-        foreach (range(1, 300) as $index) {
-            DB::select('select '.$index.' as row_number_with_a_long_alias_to_take_space');
+    $padding = str_repeat('x', 300);
+    Route::get('/report', function () use ($padding) {
+        foreach (range(1, 1000) as $index) {
+            DB::select("select {$index} as row_number, '{$padding}' as padding");
         }
         report(new RuntimeException('After the burst'));
 
@@ -44,7 +45,9 @@ test('a burst of queries never pushes an exception out of the batch', function (
 
     $this->get('/report');
 
-    expect(collect(sentEvents())->firstWhere('type', 'exception')['message'])->toBe('After the burst');
+    $events = collect(sentEvents());
+    expect($events->firstWhere('type', 'exception')['message'])->toBe('After the burst')
+        ->and($events->where('type', 'query')->count())->toBeLessThan(666);
 });
 
 test('more queries than the event limit never push the request or its exception out', function () {
