@@ -3,6 +3,7 @@
 namespace Postingher\MonitorAgent;
 
 use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
@@ -15,6 +16,7 @@ use Illuminate\Support\ServiceProvider;
 use Postingher\MonitorAgent\Collectors\ExceptionCollector;
 use Postingher\MonitorAgent\Collectors\JobCollector;
 use Postingher\MonitorAgent\Collectors\LogCollector;
+use Postingher\MonitorAgent\Collectors\RequestCollector;
 use Postingher\MonitorAgent\Support\ContextSanitizer;
 use Postingher\MonitorAgent\Support\StackTraceFormatter;
 use Throwable;
@@ -63,6 +65,7 @@ class MonitorAgentServiceProvider extends ServiceProvider
     private function registerCollectors(): void
     {
         Event::listen(MessageLogged::class, [LogCollector::class, 'handle']);
+        Event::listen(RequestHandled::class, [RequestCollector::class, 'handle']);
         Event::listen(JobProcessing::class, [JobCollector::class, 'processing']);
         Event::listen(JobProcessed::class, [JobCollector::class, 'processed']);
         Event::listen(JobFailed::class, [JobCollector::class, 'failed']);

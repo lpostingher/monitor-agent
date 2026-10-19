@@ -5,6 +5,7 @@ namespace Postingher\MonitorAgent\Collectors;
 use Postingher\MonitorAgent\Agent;
 use Postingher\MonitorAgent\Support\ContextSanitizer;
 use Postingher\MonitorAgent\Support\ExceptionMessage;
+use Postingher\MonitorAgent\Support\RequestUrl;
 use Postingher\MonitorAgent\Support\StackTraceFormatter;
 use Postingher\MonitorAgent\Support\Timestamp;
 use Postingher\MonitorAgent\Trace;
@@ -108,12 +109,9 @@ class ExceptionCollector
         $context = $this->context;
 
         if ($route !== null) {
-            $hasSecretParameters = collect($route->parameterNames())
-                ->contains(fn (string $name): bool => $this->sanitizer->isSensitive($name));
-
             $context['request'] = [
                 'method' => $request->method(),
-                'url' => $hasSecretParameters ? $route->uri() : $request->url(),
+                'url' => RequestUrl::for($request, $this->sanitizer),
                 'route' => $route->getName() ?? $route->uri(),
             ];
         } elseif ($context === [] && app()->runningInConsole()) {

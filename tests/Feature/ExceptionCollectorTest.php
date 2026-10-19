@@ -53,7 +53,7 @@ test('adds the request to exceptions thrown while handling one', function () {
 
     expect(sentEventsOfType('exception')[0]['context']['request'])->toBe([
         'method' => 'GET',
-        'url' => 'http://localhost/checkout/7',
+        'url' => 'checkout/7',
         'route' => 'checkout',
     ]);
 });
