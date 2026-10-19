@@ -4,9 +4,16 @@ namespace Postingher\MonitorAgent;
 
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Queue\Events\JobProcessed;
+use Illuminate\Queue\Events\JobProcessing;
+use Illuminate\Queue\Events\JobReleasedAfterException;
+use Illuminate\Queue\Events\Looping;
+use Illuminate\Queue\Events\WorkerStopping;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Postingher\MonitorAgent\Collectors\ExceptionCollector;
+use Postingher\MonitorAgent\Collectors\JobCollector;
 use Postingher\MonitorAgent\Collectors\LogCollector;
 use Postingher\MonitorAgent\Support\ContextSanitizer;
 use Postingher\MonitorAgent\Support\StackTraceFormatter;
@@ -32,6 +39,7 @@ class MonitorAgentServiceProvider extends ServiceProvider
             (int) config('monitor.max_frames'),
         ));
         $this->app->singleton(ExceptionCollector::class);
+        $this->app->singleton(JobCollector::class);
     }
 
     /**
@@ -55,6 +63,12 @@ class MonitorAgentServiceProvider extends ServiceProvider
     private function registerCollectors(): void
     {
         Event::listen(MessageLogged::class, [LogCollector::class, 'handle']);
+        Event::listen(JobProcessing::class, [JobCollector::class, 'processing']);
+        Event::listen(JobProcessed::class, [JobCollector::class, 'processed']);
+        Event::listen(JobFailed::class, [JobCollector::class, 'failed']);
+        Event::listen(JobReleasedAfterException::class, [JobCollector::class, 'released']);
+        Event::listen(Looping::class, fn () => $this->app->make(Agent::class)->flushIfDue());
+        Event::listen(WorkerStopping::class, fn () => $this->app->make(Agent::class)->flush());
 
         $this->callAfterResolving(ExceptionHandler::class, function (ExceptionHandler $handler): void {
             if (method_exists($handler, 'reportable')) {
