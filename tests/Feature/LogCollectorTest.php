@@ -1,6 +1,5 @@
 <?php
 
-use Illuminate\Http\Client\Request;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
@@ -8,25 +7,6 @@ use Illuminate\Support\Facades\Log;
 use Postingher\MonitorAgent\Agent;
 use Postingher\MonitorAgent\Collectors\LogCollector;
 use Postingher\MonitorAgent\Trace;
-
-/**
- * Flush the agent and get the events of the single batch sent.
- *
- * @return array<int, array<string, mixed>>
- */
-function sentEvents(): array
-{
-    app(Agent::class)->flush();
-
-    $events = [];
-    Http::assertSent(function (Request $request) use (&$events) {
-        $events = [...$events, ...json_decode(gzdecode($request->body()), true)['events']];
-
-        return true;
-    });
-
-    return $events;
-}
 
 beforeEach(fn () => Http::fake(['*' => Http::response(['accepted' => 1], 202)]));
 
