@@ -22,6 +22,8 @@ That's it. The service provider is discovered automatically.
 - **Exceptions** reported by the application (respecting `dontReport`), with a stack trace relative to the project root, the request method, URL and route, the authenticated user's id, or the job being processed.
 - **Logs** at `info` and above (`MONITOR_LOG_LEVEL`), with their context.
 - **Requests**: method, route pattern, controller action, status, duration and the authenticated user's id. The URL is sent without its query string, and the `/up` health check is skipped.
+- **Artisan commands**: name (never the arguments), exit code and duration. Long-running commands such as `queue:work` and `schedule:run` are skipped.
+- **Scheduled tasks**: every run with its cron expression, whether it succeeded, and its duration.
 - **Queued jobs**: every attempt with its status (processed, failed or released), duration, queue and attempt number.
 
 Every request, job and command gets a trace id, so the panel shows the logs written alongside an exception.

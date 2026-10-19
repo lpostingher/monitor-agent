@@ -2,6 +2,11 @@
 
 namespace Postingher\MonitorAgent;
 
+use Illuminate\Console\Events\CommandFinished;
+use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Console\Events\ScheduledTaskFailed;
+use Illuminate\Console\Events\ScheduledTaskFinished;
+use Illuminate\Console\Events\ScheduledTaskStarting;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Log\Events\MessageLogged;
@@ -13,10 +18,12 @@ use Illuminate\Queue\Events\Looping;
 use Illuminate\Queue\Events\WorkerStopping;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use Postingher\MonitorAgent\Collectors\CommandCollector;
 use Postingher\MonitorAgent\Collectors\ExceptionCollector;
 use Postingher\MonitorAgent\Collectors\JobCollector;
 use Postingher\MonitorAgent\Collectors\LogCollector;
 use Postingher\MonitorAgent\Collectors\RequestCollector;
+use Postingher\MonitorAgent\Collectors\ScheduledTaskCollector;
 use Postingher\MonitorAgent\Support\ContextSanitizer;
 use Postingher\MonitorAgent\Support\StackTraceFormatter;
 use Throwable;
@@ -42,6 +49,8 @@ class MonitorAgentServiceProvider extends ServiceProvider
         ));
         $this->app->singleton(ExceptionCollector::class);
         $this->app->singleton(JobCollector::class);
+        $this->app->singleton(CommandCollector::class);
+        $this->app->singleton(ScheduledTaskCollector::class);
     }
 
     /**
@@ -66,6 +75,11 @@ class MonitorAgentServiceProvider extends ServiceProvider
     {
         Event::listen(MessageLogged::class, [LogCollector::class, 'handle']);
         Event::listen(RequestHandled::class, [RequestCollector::class, 'handle']);
+        Event::listen(CommandStarting::class, [CommandCollector::class, 'starting']);
+        Event::listen(CommandFinished::class, [CommandCollector::class, 'finished']);
+        Event::listen(ScheduledTaskStarting::class, [ScheduledTaskCollector::class, 'starting']);
+        Event::listen(ScheduledTaskFinished::class, [ScheduledTaskCollector::class, 'finished']);
+        Event::listen(ScheduledTaskFailed::class, [ScheduledTaskCollector::class, 'failed']);
         Event::listen(JobProcessing::class, [JobCollector::class, 'processing']);
         Event::listen(JobProcessed::class, [JobCollector::class, 'processed']);
         Event::listen(JobFailed::class, [JobCollector::class, 'failed']);
